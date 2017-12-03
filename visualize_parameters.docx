@@ -1,0 +1,36 @@
+///fold:
+var marginalize = function(dist, key){
+  return Infer({method: "enumerate"}, function(){
+    return sample(dist)[key];
+  })
+}
+var merge = function(m, d){
+  var keys = _.keys(d)
+  return map(function(k){return {model: m[k], data: d[k], item:k} }, keys)
+}
+var correlation = function(xs, ys) {
+    var mx = sum(xs)/xs.length,
+        my = sum(ys)/ys.length;
+    var num = sum(map2(function(x,y) { (x-mx) * (y-my)}, xs, ys));
+    var den = Math.sqrt(sum(map(function(x) { (x-mx) * (x-mx)},xs))) *
+        Math.sqrt(sum(map(function(y) { (y-my) * (y-my)},ys)));
+    return num/den
+}
+///
+var posterior = editor.get('multiRegression');
+var posteriorPredictive = marginalize(posterior, "predictives")
+
+var modelDataDF = merge(posteriorPredictive.MAP().val, towMeans)
+
+
+var summaryData = map(function(x){
+  return _.extend(x, {sqErr: Math.pow(x.model-x.data, 2)})
+}, modelDataDF)
+
+print("Mean squared error = " + listMean(_.pluck(summaryData, "sqErr")))
+var varianceExplained = Math.pow(correlation(_.pluck(summaryData, "data"), _.pluck(summaryData, "model")), 2)
+print("Model explains " + Math.round(varianceExplained*100) + "% of the data")
+
+viz.scatter(modelDataDF)
+
+viz.table(summaryData)

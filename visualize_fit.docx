@@ -1,0 +1,10 @@
+///fold:
+var marginalize = function(dist, key){
+  return Infer({method: "enumerate"}, function(){
+    return sample(dist)[key];
+  })
+}
+///
+var posterior = editor.get('multiRegression');
+var parameterPosterior = marginalize(posterior, "parameters")
+viz.marginals(parameterPosterior)

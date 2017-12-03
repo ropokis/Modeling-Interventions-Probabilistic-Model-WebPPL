@@ -1,0 +1,65 @@
+// alternative proposal distribution for metropolis-hastings algorithm
+var uniformKernel = function(prevVal) {
+  return Uniform({a: prevVal - 0.2, b: prevVal + 0.2});
+};
+
+var fun_dict = {"facebook":3, "nytimes":1, "youtube":5, "ign":2, "instagram":4}
+var value_dict = {"facebook":1, "nytimes":5, "youtube":2, "ign":3, "instagram":1}; 
+var diff_dict = {"facebook":3, "nytimes":1, "youtube":2, "ign":1, "instagram":3}; 
+var websites = ["facebook", "nytimes", "youtube", "ign", "instagram"];
+var intervention_counts = [1, 2, 3, 4, 5];
+var user_ids = ["u1", "u2", "u3", "u4", "u5", "u6"];
+var data = [{"user_id": "u1", "website": "facebook", "intervention_count": 4, "success": 1}, {"user_id": "u1", "website": "instagram", "intervention_count": 5, "success": 1}, {"user_id": "u2", "website": "facebook", "intervention_count": 1, "success": 0}, {"user_id": "u3", "website": "facebook", "intervention_count": 3, "success": 1}, {"user_id": "u4", "website": "nytimes", "intervention_count": 1, "success": 1}, {"user_id": "u6", "website": "ign", "intervention_count": 1, "success": 0}, {"user_id": "u5", "website": "facebook", "intervention_count": 4, "success": 0}, {"user_id": "u4", "website": "instagram", "intervention_count": 3, "success": 1}, {"user_id": "u5", "website": "facebook", "intervention_count": 4, "success": 1}, {"user_id": "u3", "website": "facebook", "intervention_count": 4, "success": 1}, {"user_id": "u1", "website": "youtube", "intervention_count": 4, "success": 0}, {"user_id": "u2", "website": "youtube", "intervention_count": 4, "success": 1}, {"user_id": "u3", "website": "youtube", "intervention_count": 5, "success": 1}, {"user_id": "u2", "website": "facebook", "intervention_count": 3, "success": 1}];
+
+var multipleRegression = function(){
+  
+  var b0 = sample(Uniform({a: -1, b: 1}), {driftKernel: uniformKernel})
+  var b1 = sample(Uniform({a: -1, b: 1}), {driftKernel: uniformKernel})
+  var b2 = sample(Uniform({a: -1, b: 1}), {driftKernel: uniformKernel})
+  var b3 = sample(Uniform({a: -1, b: 1}), {driftKernel: uniformKernel})
+  var b4 = sample(Uniform({a: -1, b: 1}), {driftKernel: uniformKernel})
+  
+  var predictions = map(function(user_id){
+    return map(function(website){
+
+        var itemInfo = {website: website, user_id: user_id};
+        var itemData = _.where(data, itemInfo);
+        //print(itemData);
+        //print(itemData.length == 0);
+        if (itemData.length != 0) {
+          var fun = fun_dict[itemData[0]["website"]];
+          var value = value_dict[itemData[0]["website"]];
+          var difficulty = diff_dict[itemData[0]["website"]];
+          var guilt = itemData[0]["intervention_count"];
+          //print(itemData[0]["success"]);
+        
+          // linear equation
+          var decision = Infer({}, function() {
+            var action = flip(0.5) + 0;
+            //print(action);
+            //print(b0 + b4*guilt );
+            factor( b0 + b1*fun + b2*value + b3*difficulty + b4*guilt );
+            return action;
+          });
+                
+          map(function(d){ observe(decision, d["success"]) }, itemData)
+
+          //return _.object([[user_id + "_" + website + "_" + intervention_count, 1]])
+        }
+
+    }, websites)
+  }, user_ids)
+  
+  return {
+    parameters: {b0: b0, b1: b1, b2: b2, b3: b3, b4: b4},
+    predictives: _.object(_.flatten(map(function(i){ _.pairs(i) }, _.flatten(predictions)), true))
+  }
+}
+
+var nSamples = 250
+var opts = { method: "MCMC", kernel: {HMC: {steps: 5, stepSize: 0.01}},
+            callbacks: [editor.MCMCProgress()],
+             samples: nSamples, burn: nSamples/2 }
+
+var posterior = Infer(opts, multipleRegression)
+editor.put('multiRegression', posterior)
